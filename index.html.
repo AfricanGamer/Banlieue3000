@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Banlieue 3000 Mobile</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #0a0a1a; font-family: sans-serif; }
+  canvas { display: block; }
+  .button {
+    position: absolute;
+    background: rgba(0,255,255,0.5);
+    border-radius: 10px;
+    text-align: center;
+    font-size: 20px;
+    color: #000;
+    user-select: none;
+  }
+  #up { bottom: 120px; left: 70px; width: 50px; height: 50px; }
+  #down { bottom: 40px; left: 70px; width: 50px; height: 50px; }
+  #left { bottom: 80px; left: 10px; width: 50px; height: 50px; }
+  #right { bottom: 80px; left: 130px; width: 50px; height: 50px; }
+  #shoot { bottom: 60px; right: 40px; width: 70px; height: 70px; background: rgba(255,0,255,0.5);}
+  #score { position: absolute; top: 10px; left: 10px; color: #0ff; font-size: 20px; }
+</style>
+</head>
+<body>
+<div id="score">Score: 0</div>
+<canvas id="gameCanvas"></canvas>
+
+<div id="up" class="button">▲</div>
+<div id="down" class="button">▼</div>
+<div id="left" class="button">◀</div>
+<div id="right" class="button">▶</div>
+<div id="shoot" class="button">⚡</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let player = { x: 100, y: 100, size: 50, color: 'cyan', speed: 6 };
+let gadgetActive = false;
+let score = 0;
+let bullets = [];
+let pigeons = [], tacos = [];
+for(let i=0;i<5;i++){
+    pigeons.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height/2, size:30, color:'white', speed:2+Math.random()*2});
+    tacos.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height/2, size:30, color:'yellow', speed:1+Math.random()*2});
+}
+let boss = {x: canvas.width-200, y: canvas.height/2, size:70, color:'red', dir:1, hp:5};
+
+// Contrôles tactiles
+let controls = {up:false,down:false,left:false,right:false,shoot:false};
+['up','down','left','right','shoot'].forEach(id=>{
+    const btn = document.getElementById(id);
+    btn.addEventListener('touchstart', e=>{controls[id]=true;e.preventDefault();});
+    btn.addEventListener('touchend', e=>{controls[id]=false;e.preventDefault();});
+});
+
+// Tirer
+function shootBullet(){
+    bullets.push({x: player.x + player.size/2, y: player.y, size: 12, color:'magenta', speed: 10});
+}
+document.getElementById('shoot').addEventListener('touchstart', shootBullet);
+
+// Dessin fonctions
+function drawPlayer(){ ctx.fillStyle = gadgetActive ? 'magenta' : player.color; ctx.fillRect(player.x,player.y,player.size,player.size);}
+function drawNeonCity(){for(let i=0;i<10;i++){ctx.fillStyle=`rgba(0,255,255,0.2)`;ctx.fillRect(i*150,canvas.height-150-i*20,100,200);ctx.fillStyle=`rgba(255,0,255,0.2)`;ctx.fillRect(i*120+50,canvas.height-100-i*15,80,150);}}
+function drawObjects(){pigeons.forEach(p=>{ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size/2,0,Math.PI*2);ctx.fill();});tacos.forEach(t=>{ctx.fillStyle=t.color;ctx.fillRect(t.x,t.y,t.size,t.size/2);});}
+function drawBoss(){ctx.fillStyle=boss.color;ctx.fillRect(boss.x,boss.y,boss.size,boss.size);ctx.fillStyle='lime';ctx.fillRect(boss.x,boss.y-10,boss.size*(boss.hp/5),5);}
+function drawBullets(){bullets.forEach(b=>{ctx.fillStyle=b.color;ctx.fillRect(b.x,b.y,b.size,b.size);});}
+
+// Updates
+function updatePlayer(){
+    if(controls.up && player.y>0) player.y-=player.speed;
+    if(controls.down && player.y<canvas.height-player.size) player.y+=player.speed;
+    if(controls.left && player.x>0) player.x-=player.speed;
+    if(controls.right && player.x<canvas.width-player.size) player.x+=player.speed;
+    gadgetActive = controls.shoot;
+}
+function updateObjects(){pigeons.forEach(p=>{p.x+=p.speed;if(p.x>canvas.width)p.x=-p.size;});tacos.forEach(t=>{t.x-=t.speed;if(t.x<-t.size)t.x=canvas.width+t.size;});}
+function updateBoss(){boss.y+=boss.dir*2;if(boss.y<0||boss.y>canvas.height-boss.size) boss.dir*=-1;}
+function updateBullets(){bullets.forEach((b,i)=>{b.y-=b.speed;if(b.x>boss.x && b.x<boss.x+boss.size && b.y>boss.y && b.y<boss.y+boss.size){boss.hp--; bullets.splice(i,1); if(boss.hp<=0){boss.hp=5; score+=10;}}});}
+function checkCollisions(){
+    pigeons.forEach(p=>{if(player.x<p.x+p.size && player.x+player.size>p.x && player.y<p.y+p.size && player.y+player.size>p.y){score+=1;p.x=Math.random()*canvas.width;p.y=Math.random()*canvas.height/2;}});
+    tacos.forEach(t=>{if(player.x<t.x+t.size && player.x+player.size>t.x && player.y<t.y+t.size/2 && player.y+player.size>t.y){score+=1;t.x=Math.random()*canvas.width;t.y=Math.random()*canvas.height/2;}});
+    document.getElementById('score').innerText = "Score: "+score;
+}
+
+// Boucle principale
+function loop(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawNeonCity();
+    updatePlayer();
+    drawPlayer();
+    updateObjects();
+    drawObjects();
+    updateBoss();
+    drawBoss();
+    updateBullets();
+    drawBullets();
+    checkCollisions();
+    requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
